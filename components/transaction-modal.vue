@@ -3,7 +3,7 @@
     <UCard>
       <template #header>
         <div class="flex justify-between">
-          Add Transaction
+          {{ isEditing ? 'Edit' : 'Add' }} Transaction
           <UButton
             type="button"
             color="white"
@@ -17,7 +17,7 @@
       </template>
       <UForm :state="state" :schema="schema" @submit="onSubmit" ref="form" @error="onError">
         <UFormGroup :required="true" label="Transaction Type" class="mb-4">
-          <USelect placeholder="Select the transaction type" :options="types" v-model="state.type" />
+          <USelect :disabled="isEditing" placeholder="Select the transaction type" :options="types" v-model="state.type" />
         </UFormGroup>
 
         <UFormGroup label="Amount" :required="true" class="mb-4">
@@ -51,7 +51,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+
+  transaction: {
+    type: Object,
+    required: false
+  }
 });
+
+const isEditing = computed(() => !!props.transaction)
 
 const schema = z.object({
   created_at: z.string(),
@@ -74,17 +81,27 @@ const isOpen = computed({
 
 const closeModal = () => emit("update:modalValue", false);
 
-const initialState = {
+const initialState = isEditing.value ? {
+  type: props.transaction.type,
+  amount: props.transaction.amount,
+  created_at: props.transaction.created_at.split('T')[0],
+  description: props.transaction.description,
+  category: props.transaction.category
+} : {
   type: undefined,
   amount: 0,
   created_at: undefined,
   description: undefined,
-  category: undefined,
-};
+  category: undefined
+}
 
-const state = ref({
-  ...initialState,
-});
+const state = ref(isEditing.value ? {
+  type: props.transaction.type,
+  amount: props.transaction.amount,
+  created_at: props.transaction.created_at.split('T')[0],
+  description: props.transaction.description,
+  category: props.transaction.category
+} : { ...initialState });
 
 const form = ref();
 const isLoading = ref();
@@ -101,7 +118,10 @@ function resetForm() {
 const onSubmit = async () => {
   isLoading.value = true;
   try {
-    const { error } = await supabase.from("transactions").upsert({ ...state.value });
+    const { error } = await supabase.from("transactions").upsert({
+      ...state.value,
+      id: props.transaction?.id
+    });
 
     if (!error) {
       toastSuccess({
